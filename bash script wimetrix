@@ -1,0 +1,91 @@
+#! /bin/bash
+
+ REPO_URL='https://github.com/WiMetrixDev/SooperwizerBackend'
+ TARGET_FOLDER='/home/wimetrix/wimetrix/code'
+# cloning repo to the target folder
+if  [ -z "$(ls -A /home/wimetrix/wimetrix/code)" ]; then
+   echo "Empty cloning git repo"
+   git clone $REPO_URL $TARGET_FOLDER
+else
+  
+   echo "Not Empty"
+fi
+# --- DONE VIA GITHUB HOOKS.
+
+
+cd $TARGET_FOLDER
+git fetch master
+git checkout Hassan
+
+git pull 
+
+FILE=image-name.txt
+imagename=$( cat $FILE)
+dockerfile=Dockerfile
+container_name="sooperwizer-App"
+RUNNING_CONTAINER=$( docker inspect --format="{{.State.Running}}" $container_name 2> /dev/null) #### error stores in (2 > /dev/null) 2=error
+      
+
+# if FILE and dockerfile present or exist
+if [ -f "$FILE"  -a -f "$dockerfile" ]
+then
+   
+      b=$( cat ~/.bashrc | grep ^IMAGE_VERSION | awk '{print $1}' )
+      IFS="=" && Array=($b)    #break from where find = sign and stored to array
+      Doc=${Array[1]}
+    echo "$Doc"
+                                                                           # sed -n '$p' .bashrc print the last line of .bashrc file
+    docker image inspect $imagename:$Doc > /dev/null 2>&1
+    if [ "$?" -eq 0 ]
+    then
+     echo "Image exist"
+      b=$( cat ~/.bashrc | grep ^IMAGE_VERSION | awk '{print $1}' )         #strat from the line where found ^IMAGE_VERSION
+      echo "$b"
+
+      IFS="=" && Array=($b)
+      Doc=${Array[1]}
+      echo "$Doc"
+      PREV_BACKEND_IMAGE_VERSION=$Doc
+      bashrc_contents=$(cat ~/.bashrc)
+      IMAGE_VERSION=$(($Doc+1)) 
+      echo "$IMAGE_VERSION"
+      UPDATE_VERSION='IMAGE_VERSION='$IMAGE_VERSION
+      echo "$UPDATE_VERSION"
+      pattern='IMAGE_VERSION='$PREV_BACKEND_IMAGE_VERSION
+      #echo "${bashrc_contents/"$updated_contents"}"
+      #echo "${bashrc_contents/"$updated_contents"}" > ~/.bashrc
+      echo "${bashrc_contents/"$pattern"/"$UPDATE_VERSION"}" > ~/.bashrc       
+      docker rmi -rf  $imagename:$PREV_BACKEND_IMAGE_VERSION
+      docker build -t $imagename:$IMAGE_VERSION .
+
+      if [ "$RUNNING_CONTAINER" = "true" ]
+      then
+        echo "Container is running"
+         docker stop $container_name
+         docker rm -f $container_name
+         docker run -d --name $container_name $imagename:$IMAGE_VERSION
+      elif [ "$RUNNING_CONTAINER" = "false" ]
+      then
+        echo "Container is not running"
+        container_name="sooperwizer-App"
+        docker rm -f $container_name
+        docker run -d --name $container_name $imagename:$IMAGE_VERSION
+      else
+        echo "Container doesn't exist"
+        container_name="sooperwizer-App"
+        docker run -d --name $container_name $imagename:$IMAGE_VERSION
+      fi
+
+     else
+     echo "Images Not Exist"
+     docker build -t $imagename:A .
+     IMAGE_VERSION=1
+     docker build -t $imagename:$IMAGE_VERSION .
+     docker run -d --name $container_name $imagename:$IMAGE_VERSION
+    fi
+
+  else 
+  echo 'files not exist'
+ fi
+
+
